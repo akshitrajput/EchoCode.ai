@@ -1,22 +1,12 @@
-# EchoCode.ai
-EchoCode is a voice-to-code AI platform that lets users describe coding problems in natural language. It transcribes speech, enhances prompts, generates clean code, and provides explanations in the user’s preferred language. Includes a chat interface for iterative coding and clarification.
+# React + Vite
 
-###
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-<h2 align="left">⚙️ Tech Stack</h2>
+Currently, two official plugins are available:
 
-###
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-<div align="center">
-  <img src="https://skillicons.dev/icons?i=python" height="50" alt="kotlin logo"  />
-  <img width="20" />
-  <img src="https://skillicons.dev/icons?i=vite" height="50" alt="kotlin logo"  />
-  <img width="20" />
-  <img src="https://skillicons.dev/icons?i=react" height="50" alt="kotlin logo"  />
-  <img width="20" />
-  <img src="https://skillicons.dev/icons?i=javascript" height="50" alt="firebase logo"  />
-  <img width="20" />
-  <img src="https://skillicons.dev/icons?i=html" height="50" alt="gradle logo"  />
-  <img width="20" />
-  <img src="https://skillicons.dev/icons?i=css" height="50" alt="intellijidea logo"  />
-</div>
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
