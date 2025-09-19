@@ -1,17 +1,27 @@
-from fastapi import APIRouter, UploadFile, File
-import httpx
+from fastapi import APIRouter, UploadFile, File, HTTPException
+import speech_recognition as sr
+import io
 
 router = APIRouter()
 
 @router.post("/stt")
 async def speech_to_text(audio: UploadFile = File(...)):
-    # Example: send audio to Whisper API (pseudo-code)
-    # Replace with actual API call
     try:
-        # audio_bytes = await audio.read()
-        # response = await httpx.post('WHISPER_API_URL', files={'file': audio_bytes})
-        # text = response.json()['text']
-        text = "Example recognized text"  # Placeholder
-        return {"text": text}
+        audio_bytes = await audio.read()
+        audio_stream = io.BytesIO(audio_bytes)
+        
+        r = sr.Recognizer()
+        with sr.AudioFile(audio_stream) as source:
+            audio_data = r.record(source) # read the entire audio file
+
+        # recognize speech using Google Speech Recognition
+        try:
+            text = r.recognize_google(audio_data)
+            return {"text": text}
+        except sr.UnknownValueError:
+            raise HTTPException(status_code=400, detail="Google Speech Recognition could not understand audio")
+        except sr.RequestError as e:
+            raise HTTPException(status_code=500, detail=f"Could not request results from Google Speech Recognition service; {e}")
+
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
