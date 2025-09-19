@@ -41,14 +41,22 @@ function App() {
     setLoading(true);
     setError('');
     try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'audio.wav');
+
       // Send audio to backend /stt
       const sttRes = await fetch('/api/stt', {
         method: 'POST',
-        body: audioBlob
+        body: formData,
       });
+
       const sttData = await sttRes.json();
+      if (!sttRes.ok) {
+        throw new Error(sttData.detail || 'Speech-to-text conversion failed.');
+      }
       if (sttData.error) throw new Error(sttData.error);
       setChat((prev) => [...prev, { type: 'user', text: sttData.text }]);
+
       // Send text to backend /generate
       const genRes = await fetch('/api/generate', {
         method: 'POST',
@@ -57,9 +65,10 @@ function App() {
       });
       const genData = await genRes.json();
       if (genData.error) throw new Error(genData.error);
+
       // Gradually reveal AI response
       let aiText = '';
-      const words = genData.explanation.split(' ');
+      const words = (genData.explanation || '').split(' ');
       for (let i = 0; i < words.length; i++) {
         aiText += (i === 0 ? '' : ' ') + words[i];
         setChat((prev) => {
@@ -73,7 +82,9 @@ function App() {
         await new Promise((r) => setTimeout(r, 40));
       }
       // Add code as a separate bubble
-      setChat((prev) => [...prev, { type: 'ai', text: genData.code }]);
+      if (genData.code) {
+        setChat((prev) => [...prev, { type: 'ai', text: genData.code }]);
+      }
     } catch (err) {
       setError(err.message || 'Error fetching result');
     }
