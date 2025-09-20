@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { FiHome, FiClock, FiInfo, FiUser, FiPlus } from 'react-icons/fi';
 
 const ICONS = {
@@ -9,10 +9,7 @@ const ICONS = {
   user: <FiUser size={28} />,
 };
 
-function Sidebar() {
-  const [open, setOpen] = useState(true);
-  const [activeSection, setActiveSection] = useState('home');
-
+function Sidebar({ open, onToggle, activeSection, onSectionClick }) {
   const sections = [
     { key: 'home', label: 'Home' },
     { key: 'new', label: 'New Chat' },
@@ -20,17 +17,17 @@ function Sidebar() {
     { key: 'about', label: 'About' },
   ];
 
-  const handleSectionClick = (key) => {
-    setActiveSection(key);
-    // Add your navigation logic here
-  };
-
   return (
-    <div className={`flex flex-col h-screen ${open ? 'w-64' : 'w-20'} bg-gradient-to-b from-gray-900 to-gray-800 text-white shadow-lg transition-all duration-300`} style={{ fontFamily: 'Poppins, sans-serif' }}>
-      <div className="flex flex-col items-center p-4 border-b border-gray-700">
+    <aside
+      className={`flex flex-col h-screen ${open ? 'w-64' : 'w-20'} bg-gradient-to-b from-gray-900 to-gray-800 text-white shadow-lg transition-all duration-300`}
+      style={{ fontFamily: 'Poppins, sans-serif' }}
+    >
+      {/* Logo and Sidebar Toggle */}
+      <div className="flex items-center justify-between px-4 py-4 border-b border-gray-700">
         <button
-          onClick={() => setOpen(!open)}
-          className="focus:outline-none flex items-center justify-center"
+          onClick={onToggle}
+          aria-label={open ? 'Collapse sidebar' : 'Expand sidebar'}
+          className="rounded-full bg-gray-700 hover:bg-gray-600 p-2 transition-colors duration-300 focus:outline-none flex items-center justify-center"
         >
           <img
             src="/assets/app_icon.png"
@@ -39,28 +36,32 @@ function Sidebar() {
             style={{ transform: open ? 'rotate(0deg)' : 'rotate(180deg)' }}
           />
         </button>
-        {open && <span className="font-bold text-xl tracking-wide mt-2 mb-1">EchoCode.AI</span>}
+        {open && <span className="font-bold text-xl tracking-wide ml-2">EchoCode.AI</span>}
       </div>
-      <nav className="flex-1 p-4 space-y-2 flex flex-col items-center">
+
+      {/* Navigation */}
+      <nav className="flex-1 py-4 flex flex-col gap-1">
         {sections.map((item) => (
           <button
             key={item.key}
-            onClick={() => handleSectionClick(item.key)}
-            className={`flex items-center py-2 px-3 rounded hover:bg-gray-700 font-semibold transition-all duration-200 w-full ${open ? '' : 'justify-center'} ${activeSection === item.key ? 'bg-gray-700' : ''}`}
-            style={{ outline: 'none' }}
+            onClick={() => onSectionClick?.(item.key)}
+            className={`flex items-center py-2 pl-4 pr-3 rounded-lg font-semibold transition-all duration-200 outline-none
+                        ${open ? 'justify-start w-[95%]' : 'justify-center w-12 mx-auto'}
+                        ${activeSection === item.key ? 'bg-gray-700' : 'hover:bg-gray-700/70'}
+            `}
           >
             <span className="flex items-center justify-center w-8 h-8">{ICONS[item.key]}</span>
             {open && <span className="ml-3">{item.label}</span>}
           </button>
         ))}
       </nav>
-      <div className="p-4 border-t border-gray-700 flex items-center justify-center mt-auto">
-        <div className="flex items-center">
-          <span className="flex items-center justify-center w-8 h-8">{ICONS.user}</span>
-          {open && <span className="ml-3 font-medium">You</span>}
-        </div>
+
+      {/* Profile / User section */}
+      <div className="p-4 border-t border-gray-700 mt-auto flex items-center">
+        <span className="flex items-center justify-center w-8 h-8">{ICONS.user}</span>
+        {open && <span className="ml-3 font-medium truncate">You</span>}
       </div>
-    </div>
+    </aside>
   );
 }
 

@@ -26,6 +26,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [section, setSection] = useState('home');
+  const [textInput, setTextInput] = useState('');
   const chatEndRef = useRef(null);
   const [headerAtTop, setHeaderAtTop] = useState(false);
 
@@ -44,7 +45,6 @@ function App() {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'audio.wav');
 
-      // Send audio to backend /stt
       const sttRes = await fetch('/api/stt', {
         method: 'POST',
         body: formData,
@@ -57,7 +57,6 @@ function App() {
       if (sttData.error) throw new Error(sttData.error);
       setChat((prev) => [...prev, { type: 'user', text: sttData.text }]);
 
-      // Send text to backend /generate
       const genRes = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,7 +65,6 @@ function App() {
       const genData = await genRes.json();
       if (genData.error) throw new Error(genData.error);
 
-      // Gradually reveal AI response
       let aiText = '';
       const words = (genData.explanation || '').split(' ');
       for (let i = 0; i < words.length; i++) {
@@ -81,7 +79,6 @@ function App() {
         });
         await new Promise((r) => setTimeout(r, 40));
       }
-      // Add code as a separate bubble
       if (genData.code) {
         setChat((prev) => [...prev, { type: 'ai', text: genData.code }]);
       }
@@ -91,7 +88,51 @@ function App() {
     setLoading(false);
   };
 
-  // Sidebar navigation handler
+  const handleTextInput = async () => {
+    if (!textInput.trim()) return;
+    setLoading(true);
+    setError('');
+    try {
+      setChat((prev) => [...prev, { type: 'user', text: textInput }]);
+      const genRes = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: textInput })
+      });
+      const genData = await genRes.json();
+      if (genData.error) throw new Error(genData.error);
+
+      let aiText = '';
+      const words = (genData.explanation || '').split(' ');
+      for (let i = 0; i < words.length; i++) {
+        aiText += (i === 0 ? '' : ' ') + words[i];
+        setChat((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.type === 'ai') {
+            return [...prev.slice(0, -1), { type: 'ai', text: aiText }];
+          } else {
+            return [...prev, { type: 'ai', text: aiText }];
+          }
+        });
+        await new Promise((r) => setTimeout(r, 40));
+      }
+      if (genData.code) {
+        setChat((prev) => [...prev, { type: 'ai', text: genData.code }]);
+      }
+      setTextInput('');
+    } catch (err) {
+      setError(err.message || 'Error fetching result');
+    }
+    setLoading(false);
+  };
+
+  const handleFileInput = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setChat((prev) => [...prev, { type: 'user', text: `Uploaded file: ${file.name}` }]);
+    setError('File upload functionality is not implemented yet');
+  };
+
   const handleSectionClick = (key) => {
     setSection(key);
     if (key === 'new') {
@@ -103,43 +144,145 @@ function App() {
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700" style={{ fontFamily: 'Poppins, sans-serif' }}>
-      <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen((o) => !o)} sections={SIDEBAR_SECTIONS} onSectionClick={handleSectionClick} activeSection={section} />
-      <main className="flex-1 flex flex-col items-center justify-start p-0 relative">
-        <div className={`w-full flex flex-col items-center transition-all duration-700 ${headerAtTop ? 'pt-8 pb-2' : 'justify-center pt-24 pb-8'} md:pt-16 md:pb-4`} style={{ position: headerAtTop ? 'relative' : 'absolute', top: headerAtTop ? 0 : '25%', left: headerAtTop ? 0 : '50%', transform: headerAtTop ? 'none' : 'translate(-50%, -25%)', width: '100%' }}>
-          <img src="/assets/app_icon.png" alt="App Icon" className="w-16 h-16 md:w-20 md:h-20 mb-4 drop-shadow-lg" />
-          <h1 className="text-3xl md:text-5xl font-extrabold text-white mb-2 tracking-tight drop-shadow-lg text-center">EchoCode.ai</h1>
-          <p className="text-lg md:text-2xl text-gray-300 font-semibold mb-8 drop-shadow text-center">Your voice-powered programming assistant. Ask for code, explanations, and more!</p>
+      {/* Sidebar (with app_icon as close button) */}
+      <div className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-500 overflow-hidden bg-gray-900 h-screen fixed top-0 left-0 z-40`}>
+        {sidebarOpen && (
+          <>
+            <Sidebar
+              open={sidebarOpen}
+              onToggle={() => setSidebarOpen(o => !o)}
+              sections={SIDEBAR_SECTIONS}
+              onSectionClick={handleSectionClick}
+              activeSection={section}
+              className="h-full"
+            />
+          </>
+        )}
+      </div>
+
+      {/* Main content and chat area */}
+      <main
+        className="flex-1 flex flex-col relative bg-transparent"
+        style={{
+          marginLeft: sidebarOpen ? 256 : 0,
+          transition: 'margin-left 0.5s'
+        }}
+      >
+        <div className="relative flex-1 flex">
+          {/* Open sidebar button when closed */}
+          {!sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="fixed top-4 left-4 z-50 w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center shadow-lg border-2 border-gray-700 hover:bg-gray-700 transition"
+              aria-label="Open sidebar"
+            >
+              <img src="/assets/app_icon.png" alt="Open Sidebar" className="w-8 h-8" />
+            </button>
+          )}
+          <div className="flex-1 flex flex-col max-w-4xl mx-auto px-4 pt-4 pb-0 h-full" style={{ minHeight: 0 }}>
+            {/* Header with logo and tagline */}
+            <div className={`flex flex-col items-center text-center transition-all duration-700 ${headerAtTop ? 'pt-8' : 'pt-24'}`}>
+              <img src="/assets/app_icon.png" alt="App Icon" className="w-16 h-16 md:w-20 md:h-20 mb-4 drop-shadow-lg" />
+              <h1 className="text-3xl md:text-5xl font-extrabold text-white mb-2 tracking-tight drop-shadow-lg">EchoCode.ai</h1>
+              <p className="text-lg md:text-2xl text-gray-300 font-semibold mb-8 drop-shadow">
+                Your voice-powered programming assistant. Ask for code, explanations, and more!
+              </p>
+            </div>
+            {/* Scrollable chat area (never under input bar) */}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-2 pb-2" style={{ marginBottom: 96 }}>
+              {(section === 'home' || section === 'new') && (
+                <div className="flex flex-col gap-2">
+                  {chat.map((msg, idx) => (
+                    <ChatBubble key={idx} text={msg.text} type={msg.type} />
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+              )}
+              {section === 'history' && (
+                <div className="flex flex-col gap-2 bg-gray-900 bg-opacity-80 rounded-xl shadow-2xl p-8">
+                  <h2 className="text-xl font-bold text-white mb-4">Chat History</h2>
+                  {chat.length === 0 ? (
+                    <div className="text-gray-400">No history yet.</div>
+                  ) : (
+                    chat.map((msg, idx) => (
+                      <ChatBubble key={idx} text={msg.text} type={msg.type} />
+                    ))
+                  )}
+                </div>
+              )}
+              {section === 'about' && (
+                <div className="flex flex-col gap-2 bg-gray-900 bg-opacity-80 rounded-xl shadow-2xl p-8">
+                  <h2 className="text-xl font-bold text-white mb-4">About EchoCode.ai</h2>
+                  <p className="text-gray-300">
+                    EchoCode.ai is your voice-powered programming assistant. Ask for code, explanations, and more using natural speech!
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
+
+        {/* Input Bar (fixed bottom, left adjusts with sidebar) */}
         {(section === 'home' || section === 'new') && (
-          <div className="w-full max-w-2xl flex flex-col gap-2 bg-transparent rounded-xl shadow-none p-0 mt-2 overflow-y-auto flex-1" style={{ minHeight: '300px', maxHeight: '60vh' }}>
-            {chat.length === 0 ? null : chat.map((msg, idx) => (
-              <ChatBubble key={idx} text={msg.text} type={msg.type} />
-            ))}
-            <div ref={chatEndRef} />
+          <div
+            className="fixed bottom-4 right-4 flex items-center gap-2 bg-gray-800 bg-opacity-90 p-3 rounded-full shadow-xl z-50 max-w-4xl backdrop-blur-sm border border-gray-600 mx-auto"
+            style={{
+              left: sidebarOpen ? 256 : 0,
+              transition: 'left 0.5s',
+              height: 56,
+            }}
+          >
+            <label
+              htmlFor="file-upload"
+              className="cursor-pointer p-2 rounded-full hover:bg-gray-700 transition-colors duration-300 animate-pulse"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                />
+              </svg>
+              <input id="file-upload" type="file" className="hidden" onChange={handleFileInput} />
+            </label>
+            <div className="flex-1 flex items-center bg-gray-700 rounded-full px-4 py-2 border border-gray-600">
+              <input
+                type="text"
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleTextInput()}
+                placeholder="Type your message here..."
+                className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400"
+                disabled={loading}
+              />
+              <button
+                onClick={handleTextInput}
+                disabled={loading || !textInput.trim()}
+                className="ml-2 p-1 rounded-full hover:bg-gray-600 transition-colors duration-300 disabled:opacity-50"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+            <div className="ml-2">
+              <VoiceRecorderButton onVoiceInput={handleVoiceInput} loading={loading} floating />
+            </div>
           </div>
         )}
-        {section === 'history' ? (
-          <div className="w-full max-w-2xl flex flex-col gap-2 bg-gray-900 bg-opacity-80 rounded-xl shadow-2xl p-8 mt-2 overflow-y-auto flex-1" style={{ minHeight: '300px', maxHeight: '60vh' }}>
-            <h2 className="text-xl font-bold text-white mb-4">Chat History</h2>
-            {chat.length === 0 ? <div className="text-gray-400">No history yet.</div> : chat.map((msg, idx) => (
-              <ChatBubble key={idx} text={msg.text} type={msg.type} />
-            ))}
-          </div>
-        ) : null}
-        {section === 'about' ? (
-          <div className="w-full max-w-2xl flex flex-col gap-2 bg-gray-900 bg-opacity-80 rounded-xl shadow-2xl p-8 mt-2">
-            <h2 className="text-xl font-bold text-white mb-4">About EchoCode.ai</h2>
-            <p className="text-gray-300">EchoCode.ai is your voice-powered programming assistant. Ask for code, explanations, and more using natural speech!</p>
-          </div>
-        ) : null}
-        {error && <div className="text-red-500 mt-2 font-bold">{error}</div>}
-        {/* Absolutely centered mic button at bottom of main content area */}
-        {(section === 'home' || section === 'new') && (
-          <div className="absolute left-1/2 bottom-20 md:bottom-10 transform -translate-x-1/2 z-50">
-            <VoiceRecorderButton onVoiceInput={handleVoiceInput} loading={loading} floating />
-          </div>
-        )}
-        {/* Footer removed as requested */}
       </main>
     </div>
   );
