@@ -12,6 +12,5 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 app.include_router(stt_router, prefix="/api")
 app.include_router(generate_router, prefix="/api")
