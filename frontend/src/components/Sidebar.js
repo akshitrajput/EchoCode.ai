@@ -32,11 +32,10 @@ function Sidebar({ open, onToggle, activeSection, onSectionClick }) {
           <img
             src="/assets/app_icon.png"
             alt="App Icon"
-            className={`w-8 h-8 drop-shadow transition-transform duration-300 ${open ? 'rotate-0' : 'rotate-180'}`}
-            style={{ transform: open ? 'rotate(0deg)' : 'rotate(180deg)' }}
+            className={`w-8 h-8 drop-shadow transform transition-transform duration-300 ${open ? 'rotate-0' : 'rotate-180'}`}
           />
         </button>
-        {open && <span className="font-bold text-xl tracking-wide ml-2">EchoCode.AI</span>}
+        {/* {open && <span className="font-bold text-xl tracking-wide ml-2">EchoCode.AI</span>} */}
       </div>
 
       {/* Navigation */}
@@ -56,8 +55,15 @@ function Sidebar({ open, onToggle, activeSection, onSectionClick }) {
         ))}
       </nav>
 
+      {/* EchoCode text above the border line */}
+      {open && (
+        <div className="px-4 py-2 text-xs font-light text-gray-400 select-none border-t border-gray-700">
+          EchoCode © 2025
+        </div>
+      )}
+
       {/* Profile / User section */}
-      <div className="p-4 border-t border-gray-700 mt-auto flex items-center">
+      <div className="p-4 flex items-center">
         <span className="flex items-center justify-center w-8 h-8">{ICONS.user}</span>
         {open && <span className="ml-3 font-medium truncate">You</span>}
       </div>

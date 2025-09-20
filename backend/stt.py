@@ -19,9 +19,9 @@ async def speech_to_text(audio: UploadFile = File(...)):
             text = r.recognize_google(audio_data)
             return {"text": text}
         except sr.UnknownValueError:
-            raise HTTPException(status_code=400, detail="Google Speech Recognition could not understand audio")
+            raise HTTPException(status_code=400, detail="Could not understand audio")
         except sr.RequestError as e:
-            raise HTTPException(status_code=500, detail=f"Could not request results from Google Speech Recognition service; {e}")
+            raise HTTPException(status_code=500, detail=f"Could not request results; {e}")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

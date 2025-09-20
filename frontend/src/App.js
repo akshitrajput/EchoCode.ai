@@ -170,15 +170,18 @@ function App() {
       >
         <div className="relative flex-1 flex">
           {/* Open sidebar button when closed */}
-          {!sidebarOpen && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="fixed top-4 left-4 z-50 w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center shadow-lg border-2 border-gray-700 hover:bg-gray-700 transition"
-              aria-label="Open sidebar"
-            >
-              <img src="/assets/app_icon.png" alt="Open Sidebar" className="w-8 h-8" />
-            </button>
-          )}
+          <button
+  onClick={() => setSidebarOpen(!sidebarOpen)}
+  className="fixed top-4 left-4 z-50 w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center shadow-lg border-2 border-gray-700 hover:bg-gray-700 transition"
+  aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+>
+  <img
+    src="/assets/app_icon.png"
+    alt="Toggle Sidebar"
+    className={`w-8 h-8 transform transition-transform duration-300 ${sidebarOpen ? 'rotate-0' : 'rotate-180'}`}
+  />
+</button>
+
           <div className="flex-1 flex flex-col max-w-4xl mx-auto px-4 pt-4 pb-0 h-full" style={{ minHeight: 0 }}>
             {/* Header with logo and tagline */}
             <div className={`flex flex-col items-center text-center transition-all duration-700 ${headerAtTop ? 'pt-8' : 'pt-24'}`}>
