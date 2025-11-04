@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import VoiceRecorderButton from './components/VoiceRecorderButton';
+import ResultDisplay from './components/ResultDisplay'; // Make sure this is imported
 import './App.css';
 
 function ChatBubble({ text, type }) {
@@ -45,6 +46,7 @@ function App() {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'audio.wav');
 
+      // 1. STT Call
       const sttRes = await fetch('/api/stt', {
         method: 'POST',
         body: formData,
@@ -57,33 +59,60 @@ function App() {
       if (sttData.error) throw new Error(sttData.error);
       setChat((prev) => [...prev, { type: 'user', text: sttData.text }]);
 
+      // 2. Translation (if needed)
+      let queryText = sttData.text;
+      if (sttData.language && sttData.language !== 'en') {
+        // This assumes you have a /api/translate endpoint
+        const transRes = await fetch('/api/translate', { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: sttData.text, target: 'en' })
+        });
+        if (!transRes.ok) throw new Error('Translation failed');
+        
+        const transData = await transRes.json();
+        queryText = transData.translatedText; 
+      }
+
+      // 3. Generation Call
       const genRes = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: sttData.text })
+        body: JSON.stringify({ query: queryText })
       });
       const genData = await genRes.json();
       if (genData.error) throw new Error(genData.error);
 
-      let aiText = '';
-      const words = (genData.explanation || '').split(' ');
-      for (let i = 0; i < words.length; i++) {
-        aiText += (i === 0 ? '' : ' ') + words[i];
-        setChat((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.type === 'ai') {
-            return [...prev.slice(0, -1), { type: 'ai', text: aiText }];
-          } else {
-            return [...prev, { type: 'ai', text: aiText }];
+      // 4. Add full response object to chat
+      if (genData.explanation || genData.code) {
+        setChat((prev) => [
+          ...prev,
+          {
+            type: 'ai',
+            explanation: genData.explanation,
+            code: genData.code,
+            language: genData.language || 'python'
           }
-        });
-        await new Promise((r) => setTimeout(r, 40));
+        ]);
       }
-      if (genData.code) {
-        setChat((prev) => [...prev, { type: 'ai', text: genData.code }]);
-      }
+
+      // --- OLD LOGIC REMOVED ---
+      // The word-by-word streaming loop that was here has been
+      // removed, as it was conflicting with the logic above.
+      // The GradualText component inside ResultDisplay handles streaming now.
+
     } catch (err) {
       setError(err.message || 'Error fetching result');
+      // THIS IS THE NEW LINE:
+      setChat((prev) => [
+        ...prev,
+        {
+          type: 'ai',
+          explanation: `Error: ${err.message}`, // Show the error
+          code: null,
+          language: 'bash'
+        }
+      ]);
     }
     setLoading(false);
   };
@@ -92,36 +121,48 @@ function App() {
     if (!textInput.trim()) return;
     setLoading(true);
     setError('');
+    const userQuery = textInput; // Store text input before clearing
+    setTextInput(''); // Clear input immediately
     try {
-      setChat((prev) => [...prev, { type: 'user', text: textInput }]);
+      setChat((prev) => [...prev, { type: 'user', text: userQuery }]);
+      
       const genRes = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: textInput })
+        body: JSON.stringify({ query: userQuery })
       });
       const genData = await genRes.json();
       if (genData.error) throw new Error(genData.error);
 
-      let aiText = '';
-      const words = (genData.explanation || '').split(' ');
-      for (let i = 0; i < words.length; i++) {
-        aiText += (i === 0 ? '' : ' ') + words[i];
-        setChat((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.type === 'ai') {
-            return [...prev.slice(0, -1), { type: 'ai', text: aiText }];
-          } else {
-            return [...prev, { type: 'ai', text: aiText }];
+      // Add full response object to chat
+      if (genData.explanation || genData.code) {
+        setChat((prev) => [
+          ...prev,
+          {
+            type: 'ai',
+            explanation: genData.explanation,
+            code: genData.code,
+            language: genData.language || 'python'
           }
-        });
-        await new Promise((r) => setTimeout(r, 40));
+        ]);
       }
-      if (genData.code) {
-        setChat((prev) => [...prev, { type: 'ai', text: genData.code }]);
-      }
-      setTextInput('');
+      
+      // --- OLD LOGIC REMOVED ---
+      // The word-by-word streaming loop that was here has been
+      // removed, as it was conflicting with the logic above.
+
     } catch (err) {
       setError(err.message || 'Error fetching result');
+      // THIS IS THE NEW LINE:
+      setChat((prev) => [
+        ...prev,
+        {
+          type: 'ai',
+          explanation: `Error: ${err.message}`, // Show the error
+          code: null,
+          language: 'bash'
+        }
+      ]);
     }
     setLoading(false);
   };
@@ -171,16 +212,16 @@ function App() {
         <div className="relative flex-1 flex">
           {/* Open sidebar button when closed */}
           <button
-  onClick={() => setSidebarOpen(!sidebarOpen)}
-  className="fixed top-4 left-4 z-50 w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center shadow-lg border-2 border-gray-700 hover:bg-gray-700 transition"
-  aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
->
-  <img
-    src="/assets/app_icon.png"
-    alt="Toggle Sidebar"
-    className={`w-8 h-8 transform transition-transform duration-300 ${sidebarOpen ? 'rotate-0' : 'rotate-180'}`}
-  />
-</button>
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="fixed top-4 left-4 z-50 w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center shadow-lg border-2 border-gray-700 hover:bg-gray-700 transition"
+            aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+          >
+            <img
+              src="/assets/app_icon.png"
+              alt="Toggle Sidebar"
+              className={`w-8 h-8 transform transition-transform duration-300 ${sidebarOpen ? 'rotate-0' : 'rotate-180'}`}
+            />
+          </button>
 
           <div className="flex-1 flex flex-col max-w-4xl mx-auto px-4 pt-4 pb-0 h-full" style={{ minHeight: 0 }}>
             {/* Header with logo and tagline */}
@@ -191,26 +232,57 @@ function App() {
                 Your voice-powered programming assistant. Ask for code, explanations, and more!
               </p>
             </div>
-            {/* Scrollable chat area (never under input bar) */}
+            
+            {/* Scrollable chat area */}
             <div className="flex-1 min-h-0 overflow-y-auto pr-2 pb-2" style={{ marginBottom: 96 }}>
               {(section === 'home' || section === 'new') && (
                 <div className="flex flex-col gap-2">
-                  {chat.map((msg, idx) => (
-                    <ChatBubble key={idx} text={msg.text} type={msg.type} />
-                  ))}
+                  
+                  {/* --- THIS IS THE CORRECTED RENDER LOGIC --- */}
+                  {chat.map((msg, idx) => {
+                    if (msg.type === 'user') {
+                      return <ChatBubble key={idx} text={msg.text} type="user" />;
+                    } else if (msg.type === 'ai') {
+                      return (
+                        <ResultDisplay
+                          key={idx}
+                          explanation={msg.explanation}
+                          code={msg.code}
+                          language={msg.language}
+                        />
+                      );
+                    }
+                    return null; // Fallback
+                  })}
+                  
                   <div ref={chatEndRef} />
                 </div>
               )}
               {section === 'history' && (
                 <div className="flex flex-col gap-2 bg-gray-900 bg-opacity-80 rounded-xl shadow-2xl p-8">
                   <h2 className="text-xl font-bold text-white mb-4">Chat History</h2>
+                  
+                  {/* --- THIS ALSO NEEDS TO BE UPDATED --- */}
                   {chat.length === 0 ? (
                     <div className="text-gray-400">No history yet.</div>
                   ) : (
-                    chat.map((msg, idx) => (
-                      <ChatBubble key={idx} text={msg.text} type={msg.type} />
-                    ))
+                    chat.map((msg, idx) => {
+                      if (msg.type === 'user') {
+                        return <ChatBubble key={idx} text={msg.text} type="user" />;
+                      } else if (msg.type === 'ai') {
+                        return (
+                          <ResultDisplay
+                            key={idx}
+                            explanation={msg.explanation}
+                            code={msg.code}
+                            language={msg.language}
+                          />
+                        );
+                      }
+                      return null;
+                    })
                   )}
+                  
                 </div>
               )}
               {section === 'about' && (
@@ -237,7 +309,7 @@ function App() {
           >
             <label
               htmlFor="file-upload"
-              className="cursor-pointer p-2 rounded-full hover:bg-gray-700 transition-colors duration-300 animate-pulse"
+              className="cursor-pointer p-2 rounded-full hover:bg-gray-700 transition-colors duration-300"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -270,19 +342,14 @@ function App() {
                 disabled={loading || !textInput.trim()}
                 className="ml-2 p-1 rounded-full hover:bg-gray-600 transition-colors duration-300 disabled:opacity-50"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                {/* Send Icon */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
               </button>
             </div>
             <div className="ml-2">
-              <VoiceRecorderButton onVoiceInput={handleVoiceInput} loading={loading} floating />
+              <VoiceRecorderButton onVoiceInput={handleVoiceInput} loading={loading} />
             </div>
           </div>
         )}

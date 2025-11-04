@@ -14,7 +14,7 @@ A website where users can **speak queries** like "Give me a program for Fibonacc
 - 📄 **Text Output**: Show nicely formatted explanation + syntax-highlighted code block.
 
 ## Tech Stack
-- **Frontend**: React + TailwindCSS
+- **Frontend**: React + CSS
   - Components:
     - Voice Recorder button (🎤)
     - Text display for recognized query
@@ -50,3 +50,15 @@ Generate:
 2. Example React frontend code (App.js, components).
 3. FastAPI backend code (main.py + routes).
 4. Package.json, requirements.txt.
+
+ ## 1907  pip install -r requirements.txt
+ ##  1908  pip install fastapi
+ ##  1909  pip install speech_recognition
+ ##  1910  pip install speechrecognition
+  ## 1911  pip install python-multipart
+ ##  1912  uvicorn main:app --reload
+ ##  1913  echo 'export PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
+  ## 1914  source ~/.bashrc
+  ## 1915  uvicorn main:app --reload
+ ##  1916  npm start
+ ##  1917  uvicorn main:app --reload
