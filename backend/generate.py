@@ -20,13 +20,17 @@ async def generate_code(request: Request):
     prompt_template = f"""
     User query: "{query}"
 
-    You are a coding assistant. Provide a concise explanation and a code snippet for the user's query.
-    **The code snippet must not include any comments.**
+    You are a coding assistant.
+    
+    **CRITICAL INSTRUCTIONS:**
+    1.  You MUST generate code that **directly answers the user's specific query**. Do not provide generic or unrelated examples. (For example, if the user asks for "palindrome", you MUST provide palindrome code).
+    2.  The **explanation** must be simple, plain text, and **suitable for speech**. Do NOT use Markdown (like ` `), LaTeX (like `$n!$`), or dollar signs.
+    3.  The **code snippet** must NOT include any comments.
 
     Format your response *exactly* as follows, with no other text before or after:
 
     [EXPLANATION]
-    (Your explanation here, in markdown)
+    (Your explanation here)
     [CODE]
     (language, e.g., python, java, etc.)
     (Your code block starting on the next line)

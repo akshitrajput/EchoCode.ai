@@ -1,8 +1,41 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import speech_recognition as sr
 import io
+import traceback
 
 router = APIRouter()
+
+# --- 1. Define your 25 supported languages in one list ---
+SUPPORTED_LANGUAGES = [
+    # 15 Indian Languages
+    'en-IN', # English (India)
+    'hi-IN', # Hindi
+    'ta-IN', # Tamil
+    'te-IN', # Telugu
+    'mr-IN', # Marathi
+    'gu-IN', # Gujarati
+    'bn-IN', # Bengali
+    'kn-IN', # Kannada
+    'ml-IN', # Malayalam
+    'pa-IN', # Punjabi
+    'ur-IN', # Urdu
+    'or-IN', # Odia
+    'sa-IN', # Sanskrit
+    'ne-NP', # Nepali (Commonly spoken in India)
+    'bho-IN',# Bhojpuri
+    
+    # 10 World Languages
+    'es-ES', # Spanish
+    'fr-FR', # French
+    'de-DE', # German
+    'ja-JP', # Japanese
+    'zh-CN', # Chinese (Mandarin, Simplified)
+    'ru-RU', # Russian
+    'pt-BR', # Portuguese (Brazil)
+    'ar-SA', # Arabic (Saudi Arabia)
+    'ko-KR', # Korean
+    'it-IT', # Italian
+]
 
 @router.post("/stt")
 async def speech_to_text(audio: UploadFile = File(...)):
@@ -12,34 +45,33 @@ async def speech_to_text(audio: UploadFile = File(...)):
         
         r = sr.Recognizer()
         with sr.AudioFile(audio_stream) as source:
-            audio_data = r.record(source)
+            audio_data = r.record(source) # read the entire audio file
 
-        text = ""
-        lang = ""
-
-        # 1. Try to recognize as English first
-        try:
-            text = r.recognize_google(audio_data, language='en-IN')
-            lang = 'en'
-            print(f"STT (en): {text}")
-        except sr.UnknownValueError:
-            # 2. If English fails, try to recognize as Hindi
-            print("Could not understand English, trying Hindi...")
+        # --- 2. Loop through the list ---
+        for lang_code in SUPPORTED_LANGUAGES:
             try:
-                text = r.recognize_google(audio_data, language='hi-IN')
-                lang = 'hi'
-                print(f"STT (hi): {text}")
+                # Try to recognize with the current language
+                text = r.recognize_google(audio_data, language=lang_code)
+                
+                # Success! Get the simple lang code (e.g., 'ta-IN' -> 'ta')
+                lang = lang_code.split('-')[0] 
+                
+                print(f"STT success ({lang}): {text}")
+                return {"text": text, "language": lang}
+            
             except sr.UnknownValueError:
-                print("Could not understand Hindi either.")
-                raise HTTPException(status_code=400, detail="Could not understand audio in English or Hindi.")
+                # This is OK. It just means the audio wasn't this language.
+                # The loop will continue and try the next one.
+                print(f"Audio was not recognized as {lang_code}.")
+                continue 
+            
+            except sr.RequestError as e:
+                # This is a real API error (e.g., network issue)
+                raise HTTPException(status_code=500, detail=f"Google Speech API error; {e}")
         
-        except sr.RequestError as e:
-            raise HTTPException(status_code=500, detail=f"Google Speech API error; {e}")
-
-        # Return both the text and the detected language
-        return {"text": text, "language": lang}
+        # --- 3. If the loop finishes, no language was recognized ---
+        raise HTTPException(status_code=400, detail="Could not understand audio in any supported language.")
 
     except Exception as e:
-        import traceback
         print("Error in STT:", traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))

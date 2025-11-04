@@ -39,80 +39,71 @@ function App() {
     if (chat.length > 0) setHeaderAtTop(true);
   }, [chat]);
 
-  const handleVoiceInput = async (audioBlob) => {
+const handleVoiceInput = async (audioBlob) => {
     setLoading(true);
     setError('');
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'audio.wav');
 
-      // 1. STT Call
+      // 1. Get text and language from STT
       const sttRes = await fetch('/api/stt', {
         method: 'POST',
         body: formData,
       });
-
       const sttData = await sttRes.json();
-      if (!sttRes.ok) {
-        throw new Error(sttData.detail || 'Speech-to-text conversion failed.');
-      }
-      if (sttData.error) throw new Error(sttData.error);
-      setChat((prev) => [...prev, { type: 'user', text: sttData.text }]);
+      if (!sttRes.ok) throw new Error(sttData.detail);
+      
+      const { text: originalText, language: originalLang } = sttData;
+      setChat((prev) => [...prev, { type: 'user', text: originalText }]);
 
-      // 2. Translation (if needed)
-      let queryText = sttData.text;
-      if (sttData.language && sttData.language !== 'en') {
-        // This assumes you have a /api/translate endpoint
-        const transRes = await fetch('/api/translate', { 
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: sttData.text, target: 'en' })
-        });
-        if (!transRes.ok) throw new Error('Translation failed');
-        
-        const transData = await transRes.json();
-        queryText = transData.translatedText; 
+      let englishQuery = originalText;
+
+      // 2. Translate to English if not already English
+      if (originalLang !== 'en') {
+        const { translatedText } = await translateText(originalText, 'en', originalLang);
+        englishQuery = translatedText;
       }
 
-      // 3. Generation Call
+      // 3. Send English query to Gemini
       const genRes = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: queryText })
+        body: JSON.stringify({ query: englishQuery })
       });
       const genData = await genRes.json();
       if (genData.error) throw new Error(genData.error);
 
-      // 4. Add full response object to chat
-      if (genData.explanation || genData.code) {
+      let translatedExplanation = genData.explanation;
+
+      // 4. Translate explanation BACK to original language (if not English)
+      if (originalLang !== 'en' && genData.explanation) {
+        const { translatedText } = await translateText(genData.explanation, originalLang);
+        translatedExplanation = translatedText;
+      }
+
+      // 5. Add to chat
+      if (translatedExplanation || genData.code) {
         setChat((prev) => [
           ...prev,
           {
             type: 'ai',
-            explanation: genData.explanation,
+            explanation: translatedExplanation,
             code: genData.code,
-            language: genData.language || 'python'
+            language: genData.language || 'python',
+            originalLang: originalLang // Pass the lang to ResultDisplay
           }
         ]);
       }
-
-      // --- OLD LOGIC REMOVED ---
-      // The word-by-word streaming loop that was here has been
-      // removed, as it was conflicting with the logic above.
-      // The GradualText component inside ResultDisplay handles streaming now.
-
     } catch (err) {
-      setError(err.message || 'Error fetching result');
-      // THIS IS THE NEW LINE:
-      setChat((prev) => [
-        ...prev,
-        {
-          type: 'ai',
-          explanation: `Error: ${err.message}`, // Show the error
-          code: null,
-          language: 'bash'
-        }
-      ]);
+      setError(err.message);
+      setChat((prev) => [...prev, {
+        type: 'ai',
+        explanation: `Error: ${err.message}`,
+        code: null,
+        language: 'bash',
+        originalLang: 'en'
+      }]);
     }
     setLoading(false);
   };
@@ -121,50 +112,69 @@ function App() {
     if (!textInput.trim()) return;
     setLoading(true);
     setError('');
-    const userQuery = textInput; // Store text input before clearing
-    setTextInput(''); // Clear input immediately
+    const userQuery = textInput;
+    setTextInput('');
+    setChat((prev) => [...prev, { type: 'user', text: userQuery }]);
+
     try {
-      setChat((prev) => [...prev, { type: 'user', text: userQuery }]);
-      
+      // 1. Translate query to English and detect original language
+      const { translatedText: englishQuery, detectedLanguage: originalLang } = 
+        await translateText(userQuery, 'en', 'auto');
+
+      // 2. Send English query to Gemini
       const genRes = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: userQuery })
+        body: JSON.stringify({ query: englishQuery })
       });
       const genData = await genRes.json();
       if (genData.error) throw new Error(genData.error);
 
-      // Add full response object to chat
-      if (genData.explanation || genData.code) {
+      let translatedExplanation = genData.explanation;
+
+      // 3. Translate explanation BACK to original language (if not English)
+      if (originalLang !== 'en' && genData.explanation) {
+        const { translatedText } = await translateText(genData.explanation, originalLang);
+        translatedExplanation = translatedText;
+      }
+
+      // 4. Add to chat
+      if (translatedExplanation || genData.code) {
         setChat((prev) => [
           ...prev,
           {
             type: 'ai',
-            explanation: genData.explanation,
+            explanation: translatedExplanation,
             code: genData.code,
-            language: genData.language || 'python'
+            language: genData.language || 'python',
+            originalLang: originalLang // Pass the lang to ResultDisplay
           }
         ]);
       }
-      
-      // --- OLD LOGIC REMOVED ---
-      // The word-by-word streaming loop that was here has been
-      // removed, as it was conflicting with the logic above.
-
     } catch (err) {
-      setError(err.message || 'Error fetching result');
-      // THIS IS THE NEW LINE:
-      setChat((prev) => [
-        ...prev,
-        {
-          type: 'ai',
-          explanation: `Error: ${err.message}`, // Show the error
-          code: null,
-          language: 'bash'
-        }
-      ]);
+      setError(err.message);
+      setChat((prev) => [...prev, {
+        type: 'ai',
+        explanation: `Error: ${err.message}`,
+        code: null,
+        language: 'bash',
+        originalLang: 'en'
+      }]);
     }
     setLoading(false);
+  };
+
+  const translateText = async (text, target, source = 'auto') => {
+    const res = await fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, target, source })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Translation failed');
+    }
+    return res.json();
   };
 
   const handleFileInput = (e) => {
@@ -249,6 +259,7 @@ function App() {
                           explanation={msg.explanation}
                           code={msg.code}
                           language={msg.language}
+                          originalLang={msg.originalLang}
                         />
                       );
                     }
@@ -276,6 +287,7 @@ function App() {
                             explanation={msg.explanation}
                             code={msg.code}
                             language={msg.language}
+                            originalLang={msg.originalLang}
                           />
                         );
                       }

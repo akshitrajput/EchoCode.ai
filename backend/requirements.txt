@@ -3,3 +3,9 @@ uvicorn
 httpx
 openai
 python-dotenv
+SpeechRecognition
+python-multipart
+pyaudio
+pydantic
+requests
+googletrans==4.0.0-rc1
