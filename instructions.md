@@ -62,3 +62,4 @@ Generate:
     ## 1915  uvicorn main:app --reload
   ##  1916  npm start
   ##  1917  uvicorn main:app --reload
+  ## pip install googletrans==4.0.0-rc1
